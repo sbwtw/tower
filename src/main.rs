@@ -12,6 +12,9 @@ use time::*;
 use rustc_serialize::json::*;
 
 use std::io::*;
+use std::env::*;
+use std::fs::File;
+use std::path::Path;
 use std::collections::HashMap;
 
 use database::SqliteCookie;
@@ -223,10 +226,42 @@ impl App {
     }
 }
 
+fn search_cookie_sqlite() -> Option<String> {
+
+    let home = home_dir().unwrap();
+    let config_file = format!("{}/.mozilla/firefox/profiles.ini", home.display());
+
+    let file = File::open(config_file);
+    if file.is_err() {
+        return None;
+    }
+
+    for line in BufReader::new(&file.unwrap()).lines() {
+        if line.is_err() {continue;}
+
+        let l = line.unwrap();
+        if !l.starts_with("Path=") {continue;}
+
+        let dir: Vec<&str> = l.split('=').collect();
+        let sqlite = format!("{}/.mozilla/firefox/{}/cookies.sqlite", home.display(), dir[1]);
+        if Path::new(&sqlite).exists() {
+            return Some(sqlite);
+        } else {
+            return None;
+        }
+    }
+
+    None
+}
+
 fn main() {
 
     let mut app = App::new();
-    app.load_sqlite("/home/.mozilla/firefox/f4gtaef6.default/cookies.sqlite");
+    if let Some(file) = search_cookie_sqlite() {
+        app.load_sqlite(file);
+    } else {
+        panic!("cant load cookies");
+    }
     app.show_weekly_reports();
     // app.send_weekly_reports();
 }
