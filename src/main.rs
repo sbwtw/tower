@@ -2,9 +2,12 @@
 #[macro_use]
 extern crate hyper;
 extern crate regex;
+extern crate time;
 extern crate rustc_serialize;
 
 mod database;
+
+use time::*;
 
 use rustc_serialize::json::*;
 
@@ -106,6 +109,7 @@ impl App {
     }
 
     pub fn show_weekly_reports(&self) {
+
         let client = Client::new();
         let url = self.weekly_reports_url(&self.uid, &self.conn_guid);
         let request = client.get(&url).headers(self.headers.clone());
@@ -137,8 +141,12 @@ impl App {
 
     pub fn send_weekly_reports(&self) {
 
+        let year = self.current_year();
+        let week = self.current_week();
+
         // get weekly info
-        let url = format!("https://tower.im/members/{}/weekly_reports/2016-34/edit?conn_guid={}", self.uid, self.conn_guid);
+        let url = format!("https://tower.im/members/{}/weekly_reports/{}-{}/edit?conn_guid={}",
+                            self.uid, year, week, self.conn_guid);
         let client = Client::new();
         let request = client.get(&url).headers(self.headers.clone());
         let mut response = request.send().unwrap();
@@ -167,12 +175,13 @@ impl App {
 
         let answers = encode(&answers).unwrap();
         let send_data = format!("conn_guid={}&data={}", self.conn_guid, answers);
-        
+
         let mut headers = self.headers.clone();
         headers.set(POSTAccept("application/json, text/javascript, */*; q=0.01".to_owned()));
 
-        let url = "https://tower.im/members/3ececb2bcc5242928281f237c8bc3944/weekly_reports/2016-34";
-        let request = client.post(url).body(&send_data).headers(headers);
+        let url = format!("https://tower.im/members/{}/weekly_reports/{}-{}",
+                            self.uid, year, week);
+        let request = client.post(&url).body(&send_data).headers(headers);
         let mut response = request.send().unwrap();
         let mut result = String::new();
         let _ = response.read_to_string(&mut result);
@@ -204,12 +213,20 @@ impl App {
     fn members_url<T: AsRef<str>>(&self, tid: T) -> String {
         format!("https://tower.im/teams/{}/members/", tid.as_ref())
     }
+
+    fn current_year(&self) -> i32 {
+        now().tm_year + 1900
+    }
+
+    fn current_week(&self) -> String {
+        strftime("%W", &now()).unwrap()
+    }
 }
 
 fn main() {
 
     let mut app = App::new();
     app.load_sqlite("/home/.mozilla/firefox/f4gtaef6.default/cookies.sqlite");
-    // app.show_weekly_reports();
-    app.send_weekly_reports();
+    app.show_weekly_reports();
+    // app.send_weekly_reports();
 }
