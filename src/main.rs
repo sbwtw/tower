@@ -4,8 +4,11 @@ extern crate hyper;
 extern crate regex;
 extern crate time;
 extern crate rustc_serialize;
+extern crate clap;
 
 mod database;
+
+use clap::{Arg, App};
 
 use time::*;
 
@@ -27,7 +30,7 @@ use regex::Regex;
 header! { (XCSRFToken, "X-CSRF-Token") => [String] }
 header! { (POSTAccept, "Accept") => [String] }
 
-struct App {
+struct Tower {
     tid: String,
     uid: String,
     conn_guid: String,
@@ -35,9 +38,9 @@ struct App {
     member_list: HashMap<String, String>,
 }
 
-impl App {
-    pub fn new() -> App {
-        App {
+impl Tower {
+    pub fn new() -> Tower {
+        Tower {
             tid: String::new(),
             uid: String::new(),
             conn_guid: String::new(),
@@ -256,12 +259,19 @@ fn search_cookie_sqlite() -> Option<String> {
 
 fn main() {
 
-    let mut app = App::new();
+    // process command-line
+    let matches = App::new("Tower")
+                    .version("0.0.1")
+                    .author("sbw <sbw@sbw.so>")
+                    .about("Tower.im helper tools")
+                    .get_matches();
+
+    let mut tower = Tower::new();
     if let Some(file) = search_cookie_sqlite() {
-        app.load_sqlite(file);
+        tower.load_sqlite(file);
     } else {
         panic!("cant load cookies");
     }
-    app.show_weekly_reports();
+    tower.show_weekly_reports();
     // app.send_weekly_reports();
 }
