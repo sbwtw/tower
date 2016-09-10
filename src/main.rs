@@ -264,6 +264,16 @@ fn main() {
                     .version("0.0.1")
                     .author("sbw <sbw@sbw.so>")
                     .about("Tower.im helper tools")
+                    .arg(Arg::with_name("weekly")
+                         .short("w")
+                         .long("weekly")
+                         .help("Show your weekly reports"))
+                    .arg(Arg::with_name("reports")
+                         .short("r")
+                         .long("reports")
+                         .takes_value(true)
+                         .default_value("")
+                         .help("Send weekly reports"))
                     .get_matches();
 
     let mut tower = Tower::new();
@@ -272,6 +282,13 @@ fn main() {
     } else {
         panic!("cant load cookies");
     }
-    tower.show_weekly_reports();
+
+    if matches.is_present("weekly") {
+        tower.show_weekly_reports();
+    }
+
+    if matches.is_present("reports") {
+        println!("{:?}", matches.value_of("reports"));
+    }
     // app.send_weekly_reports();
 }
