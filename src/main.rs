@@ -240,10 +240,12 @@ impl Tower {
 
         let exist_len = self.answers.len();
         for (i, &(_, _, title)) in fields.iter().enumerate() {
-            print!("\n{}:", title);
+            println!("\n{}:", title);
+
+            let overflow = i >= exist_len;
 
             // show exist answer
-            if i < exist_len {
+            if !overflow {
                 println!("default: {}", self.answers[i]);
             }
 
@@ -252,10 +254,16 @@ impl Tower {
             stdin().read_to_string(&mut answer).unwrap();
             let answer = answer.trim();
 
-            if !answer.is_empty() || i >= exist_len {
-                self.answers.insert(i, answer.to_owned());
+            let e = answer.is_empty();
+
+            if !e && !overflow {
+                self.answers[i] = answer.to_owned();
+            } else if overflow {
+                self.answers.push(answer.to_owned());
             }
         }
+
+        assert!(fields.len() == self.answers.len())
     }
 
     fn weekly_reports_url<T: AsRef<str>>(&self, uid: T, conn_guid: T) -> String {
@@ -282,12 +290,21 @@ impl Tower {
 fn ask_question<T: AsRef<str>>(q: T, default: bool) -> bool {
 
     if default == true {
-        println!("{} [Y/n]:", q.as_ref());
+        print!("{} [Y/n]:", q.as_ref());
     } else {
-        println!("{} [y/N]:", q.as_ref());
+        print!("{} [y/N]:", q.as_ref());
     }
+    let _  = stdout().flush();
 
-    false
+    let mut result = String::new();
+    stdin().read_line(&mut result).unwrap();
+    let result = result.trim().to_lowercase();
+
+    match result.as_str() {
+        "y" | "yes" => true,
+        "n" | "no"  => false,
+        _           => default,
+    }
 }
 
 fn search_cookie_sqlite() -> Option<String> {
@@ -351,6 +368,8 @@ fn main() {
     } else {
         panic!("cant load cookies");
     }
+
+    println!("test question: {}", ask_question("test", true));
 
     //if matches.is_present("reports") {
         //println!("{:?}", matches.value_of("reports"));
