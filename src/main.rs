@@ -1,5 +1,8 @@
 
 #[macro_use]
+extern crate log;
+extern crate env_logger;
+#[macro_use]
 extern crate hyper;
 extern crate regex;
 extern crate time;
@@ -52,6 +55,9 @@ impl Tower {
     }
 
     pub fn load_sqlite<T: AsRef<str>>(&mut self, file: T) -> bool {
+
+        debug!("load sqlite from: {}", file.as_ref());
+
         let mut sc = SqliteCookie::new(file);
         let _ = sc.read_data();
 
@@ -362,14 +368,14 @@ fn main() {
                          //.help("Your reports content"))
                     .get_matches();
 
+    env_logger::init().unwrap();
+
     let mut tower = Tower::new();
     if let Some(file) = search_cookie_sqlite() {
         tower.load_sqlite(file);
     } else {
         panic!("cant load cookies");
     }
-
-    println!("test question: {}", ask_question("test", true));
 
     //if matches.is_present("reports") {
         //println!("{:?}", matches.value_of("reports"));
