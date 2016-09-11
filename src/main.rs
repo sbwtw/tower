@@ -34,6 +34,7 @@ struct Tower {
     tid: String,
     uid: String,
     conn_guid: String,
+    answers: Vec<String>,
     headers: Headers,
     member_list: HashMap<String, String>,
 }
@@ -44,6 +45,7 @@ impl Tower {
             tid: String::new(),
             uid: String::new(),
             conn_guid: String::new(),
+            answers: Vec::<String>::new(),
             headers: Headers::new(),
             member_list: HashMap::with_capacity(200),
         }
@@ -145,7 +147,11 @@ impl Tower {
         }
     }
 
-    pub fn send_weekly_reports(&self) {
+    pub fn show_calendar_info(&self) {
+        println!("show calendar info");
+    }
+
+    pub fn send_weekly_reports(&mut self) {
 
         let year = self.current_year();
         let week = self.current_week();
@@ -170,10 +176,16 @@ impl Tower {
             fields.push((k, v));
         }
 
+        // check answers match fields
+        while fields.len() != self.answers.len() {
+            self.get_weekly_answers(&fields);
+        }
+
         let mut answers = Array::new();
-        for &(field, value) in fields.iter() {
+        for (i, &(field, value)) in fields.iter().enumerate() {
+
             let mut object = Object::new();
-            object.insert("content".to_owned(), Json::String("".to_owned()));
+            object.insert("content".to_owned(), Json::String(self.answers[i].clone()));
             object.insert(field.to_owned(), Json::String(value.to_owned()));
 
             answers.push(Json::Object(object));
@@ -206,6 +218,10 @@ impl Tower {
         // println!("{}", json["html"]);
 
         self.show_weekly_reports();
+    }
+
+    fn get_weekly_answers(&mut self, fields: &Vec<(&str, &str)>) {
+        // TODO: get user answers
     }
 
     fn weekly_reports_url<T: AsRef<str>>(&self, uid: T, conn_guid: T) -> String {
@@ -268,12 +284,20 @@ fn main() {
                          .short("w")
                          .long("weekly")
                          .help("Show your weekly reports"))
+                    .arg(Arg::with_name("calendar")
+                         .short("c")
+                         .long("calendar")
+                         .help("Show your calendar info"))
+                    .arg(Arg::with_name("send")
+                         .short("s")
+                         .long("send")
+                         .help("Send your weekly reports"))
                     .arg(Arg::with_name("reports")
                          .short("r")
                          .long("reports")
                          .takes_value(true)
                          .default_value("")
-                         .help("Send weekly reports"))
+                         .help("Your reports content"))
                     .get_matches();
 
     let mut tower = Tower::new();
@@ -283,12 +307,15 @@ fn main() {
         panic!("cant load cookies");
     }
 
-    if matches.is_present("weekly") {
-        tower.show_weekly_reports();
-    }
-
     if matches.is_present("reports") {
         println!("{:?}", matches.value_of("reports"));
     }
-    // app.send_weekly_reports();
+
+    if matches.is_present("send") {
+        tower.send_weekly_reports();
+    }
+
+    if matches.is_present("weekly") {
+        tower.show_weekly_reports();
+    }
 }
