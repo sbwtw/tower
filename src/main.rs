@@ -147,9 +147,9 @@ impl Tower {
         }
     }
 
-    pub fn show_calendar_info(&self) {
-        println!("show calendar info");
-    }
+    //pub fn show_calendar_info(&self) {
+        //println!("show calendar info");
+    //}
 
     pub fn send_weekly_reports(&mut self) {
 
@@ -168,21 +168,22 @@ impl Tower {
         let json: Json = result.parse().unwrap();
         let result = json["html"].as_string().unwrap();
 
-        let mut fields = Vec::<(&str, &str)>::new();
+        let mut fields = Vec::<(&str, &str, &str)>::new();
         let re = Regex::new(r#"<input.*?name="(.*?)".*?value="(.*?)".*?>\s*(.*?)\s*</div>"#).unwrap();
         for caps in re.captures_iter(&result) {
             let k = caps.at(1).unwrap();
             let v = caps.at(2).unwrap();
-            fields.push((k, v));
+            let t = caps.at(3).unwrap();
+            fields.push((k, v, t));
         }
 
         // check answers match fields
-        while fields.len() != self.answers.len() {
+        while fields.len() != self.answers.len() || !self.confirm_answers(&fields) {
             self.get_weekly_answers(&fields);
         }
 
         let mut answers = Array::new();
-        for (i, &(field, value)) in fields.iter().enumerate() {
+        for (i, &(field, value, _)) in fields.iter().enumerate() {
 
             let mut object = Object::new();
             object.insert("content".to_owned(), Json::String(self.answers[i].clone()));
@@ -220,8 +221,41 @@ impl Tower {
         self.show_weekly_reports();
     }
 
-    fn get_weekly_answers(&mut self, fields: &Vec<(&str, &str)>) {
-        // TODO: get user answers
+    fn confirm_answers(&self, fields: &Vec<(&str, &str, &str)>) -> bool {
+        assert!(fields.len() == self.answers.len());
+
+        print!("\n");
+
+        // print user answers
+        for (i, ref answer) in self.answers.iter().enumerate() {
+            println!("{}:\n{}\n\n", fields[i].2, answer);
+        }
+
+        ask_question("Submit your answers?", true)
+    }
+
+    fn get_weekly_answers(&mut self, fields: &Vec<(&str, &str, &str)>) {
+
+        print!("\n");
+
+        let exist_len = self.answers.len();
+        for (i, &(_, _, title)) in fields.iter().enumerate() {
+            print!("\n{}:", title);
+
+            // show exist answer
+            if i < exist_len {
+                println!("default: {}", self.answers[i]);
+            }
+
+            // get user answer
+            let mut answer = String::new();
+            stdin().read_to_string(&mut answer).unwrap();
+            let answer = answer.trim();
+
+            if !answer.is_empty() || i >= exist_len {
+                self.answers.insert(i, answer.to_owned());
+            }
+        }
     }
 
     fn weekly_reports_url<T: AsRef<str>>(&self, uid: T, conn_guid: T) -> String {
@@ -243,6 +277,17 @@ impl Tower {
     fn current_week(&self) -> String {
         strftime("%W", &now()).unwrap()
     }
+}
+
+fn ask_question<T: AsRef<str>>(q: T, default: bool) -> bool {
+
+    if default == true {
+        println!("{} [Y/n]:", q.as_ref());
+    } else {
+        println!("{} [y/N]:", q.as_ref());
+    }
+
+    false
 }
 
 fn search_cookie_sqlite() -> Option<String> {
@@ -292,12 +337,12 @@ fn main() {
                          .short("s")
                          .long("send")
                          .help("Send your weekly reports"))
-                    .arg(Arg::with_name("reports")
-                         .short("r")
-                         .long("reports")
-                         .takes_value(true)
-                         .default_value("")
-                         .help("Your reports content"))
+                    //.arg(Arg::with_name("reports")
+                         //.short("r")
+                         //.long("reports")
+                         //.takes_value(true)
+                         //.default_value("")
+                         //.help("Your reports content"))
                     .get_matches();
 
     let mut tower = Tower::new();
@@ -307,9 +352,9 @@ fn main() {
         panic!("cant load cookies");
     }
 
-    if matches.is_present("reports") {
-        println!("{:?}", matches.value_of("reports"));
-    }
+    //if matches.is_present("reports") {
+        //println!("{:?}", matches.value_of("reports"));
+    //}
 
     if matches.is_present("send") {
         tower.send_weekly_reports();
