@@ -11,17 +11,17 @@ extern crate clap;
 
 mod database;
 
-use clap::{Arg, App};
-
-use time::*;
-
-use rustc_serialize::json::*;
-
 use std::io::*;
 use std::env::*;
 use std::fs::File;
 use std::path::Path;
 use std::collections::HashMap;
+
+use clap::{Arg, App};
+
+use time::*;
+
+use rustc_serialize::json::*;
 
 use database::SqliteCookie;
 
@@ -153,9 +153,18 @@ impl Tower {
         }
     }
 
-    //pub fn show_calendar_info(&self) {
-        //println!("show calendar info");
-    //}
+    pub fn show_calendar_info(&self) {
+
+        let client = Client::new();
+        let url = format!("https://tower.im/members/{}/calendar_events/", self.uid);
+        let request = client.get(&url).headers(self.headers.clone());
+        let mut response = request.send().unwrap();
+        let mut content = String::new();
+        let _ = response.read_to_string(&mut content);
+
+        // TODO: process content
+        println!("{}", content);
+    }
 
     pub fn send_weekly_reports(&mut self) {
 
@@ -387,5 +396,9 @@ fn main() {
 
     if matches.is_present("weekly") {
         tower.show_weekly_reports();
+    }
+
+    if matches.is_present("calendar") {
+        tower.show_calendar_info();
     }
 }
