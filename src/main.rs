@@ -124,28 +124,7 @@ impl Tower {
 
     pub fn show_weekly_reports(&self) {
 
-        let client = Client::new();
-        let url = self.weekly_reports_url(&self.uid, &self.conn_guid);
-        let request = client.get(&url).headers(self.headers.clone());
-        let mut response = request.send().unwrap();
-        let mut content = String::new();
-        let _ = response.read_to_string(&mut content);
-
-        // search weekly_title
-        let mut titles = Vec::new();
-        let re = Regex::new(r#"<dt><i class="icon twr twr-quote-left"></i>([^<]+)</dt>"#).unwrap();
-        for caps in re.captures_iter(&content) {
-            titles.push(caps.at(1).unwrap());
-        }
-
-        // search weekly_content
-        let mut contents = Vec::new();
-        let re = Regex::new(r#"<dd class="editor-style">(.*?)</dd>"#).unwrap();
-        for caps in re.captures_iter(&content) {
-            contents.push(caps.at(1).unwrap());
-        }
-
-        assert!(titles.len() == contents.len());
+        let (titles, contents) = self.get_weekly_reports();
 
         for i in 0..titles.len() {
             println!("{}", titles[i]);
@@ -234,6 +213,42 @@ impl Tower {
         // println!("{}", json["html"]);
 
         self.show_weekly_reports();
+    }
+
+    pub fn send_today_reports(&mut self) {
+
+        let (_, answers) = self.get_weekly_reports();
+
+        self.answers = answers;
+        self.send_weekly_reports();
+    }
+
+    fn get_weekly_reports(&self) -> (Vec<String>, Vec<String>) {
+
+        let client = Client::new();
+        let url = self.weekly_reports_url(&self.uid, &self.conn_guid);
+        let request = client.get(&url).headers(self.headers.clone());
+        let mut response = request.send().unwrap();
+        let mut content = String::new();
+        let _ = response.read_to_string(&mut content);
+
+        // search weekly_title
+        let mut titles = Vec::new();
+        let re = Regex::new(r#"<dt><i class="icon twr twr-quote-left"></i>([^<]+)</dt>"#).unwrap();
+        for caps in re.captures_iter(&content) {
+            titles.push(caps.at(1).unwrap().to_owned());
+        }
+
+        // search weekly_content
+        let mut contents = Vec::new();
+        let re = Regex::new(r#"<dd class="editor-style">(.*?)</dd>"#).unwrap();
+        for caps in re.captures_iter(&content) {
+            contents.push(caps.at(1).unwrap().to_owned());
+        }
+
+        assert!(titles.len() == contents.len());
+
+        (titles, contents)
     }
 
     fn confirm_answers(&self, fields: &Vec<(&str, &str, &str)>) -> bool {
@@ -369,6 +384,11 @@ fn main() {
                          .short("s")
                          .long("send")
                          .help("Send your weekly reports"))
+                    .arg(Arg::with_name("today")
+                         .short("t")
+                         .long("today")
+                         .conflicts_with("send")
+                         .help("Send your today reports"))
                     //.arg(Arg::with_name("reports")
                          //.short("r")
                          //.long("reports")
@@ -392,6 +412,10 @@ fn main() {
 
     if matches.is_present("send") {
         tower.send_weekly_reports();
+    }
+
+    if matches.is_present("today") {
+        tower.send_today_reports();
     }
 
     if matches.is_present("weekly") {
