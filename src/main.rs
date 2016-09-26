@@ -127,6 +127,11 @@ impl Tower {
 
         let (titles, contents) = self.get_weekly_reports();
 
+        if titles.len() == 0 {
+            println!("your weekly reports is empty.");
+            return;
+        }
+
         for i in 0..titles.len() {
             println!("{}", titles[i]);
             println!("{}", contents[i]);
@@ -174,16 +179,16 @@ impl Tower {
         }
 
         // check answers match fields
-        while fields.len() != self.answers.len() || !self.confirm_answers(&fields) {
+        while !self.confirm_answers(&fields) {
             self.get_weekly_answers(&fields);
         }
 
         let mut answers = Array::new();
-        for (i, &(field, value, _)) in fields.iter().enumerate() {
+        for (i, ans) in self.answers.iter().enumerate() {
 
             let mut object = Object::new();
-            object.insert("content".to_owned(), Json::String(self.answers[i].clone()));
-            object.insert(field.to_owned(), Json::String(value.to_owned()));
+            object.insert("content".to_owned(), Json::String(ans.to_owned()));
+            object.insert(fields[i].0.to_owned(), Json::String(fields[i].1.to_owned()));
 
             answers.push(Json::Object(object));
         }
@@ -208,19 +213,33 @@ impl Tower {
         if json.contains_key("success") && json["success"] == Json::Boolean(true) {
             println!("Post weekly report success.");
         } else {
+            debug!("{}", result);
             println!("Post weekly report fail.")
         }
-
-        // if json.cont
-        // println!("{}", json["html"]);
 
         self.show_weekly_reports();
     }
 
     pub fn send_today_reports(&mut self) {
 
-        let (_, answers) = self.get_weekly_reports();
+        let day_of_week: usize = strftime("%u", &now()).unwrap().parse().unwrap();
+        self.send_day_reports(day_of_week - 1);
+    }
 
+    // send spec day report, index is start with 0
+    fn send_day_reports(&mut self, index: usize) {
+
+        println!("input your reports of day {}", index + 1);
+        let mut ans = String::new();
+        let _ = stdin().read_to_string(&mut ans);
+
+        let (_, mut answers) = self.get_weekly_reports();
+
+        while answers.len() <= index {
+            answers.push(String::new());
+        }
+
+        answers[index] = ans;
         self.answers = answers;
         self.send_weekly_reports();
     }
@@ -253,13 +272,21 @@ impl Tower {
     }
 
     fn confirm_answers(&self, fields: &Vec<(&str, &str, &str)>) -> bool {
-        assert!(fields.len() == self.answers.len());
+        assert!(fields.len() >= self.answers.len());
 
         print!("\n");
 
         // print user answers
         for (i, ref answer) in self.answers.iter().enumerate() {
             println!("{}:\n{}\n\n", fields[i].2, answer);
+        }
+
+        if fields.len() != self.answers.len() {
+            println!("some fields not filled:");
+
+            for i in self.answers.len()..fields.len() {
+                println!("{}", fields[i].2);
+            }
         }
 
         ask_question("Submit your answers?", true)
