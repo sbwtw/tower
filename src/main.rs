@@ -34,6 +34,7 @@ header! { (XCSRFToken, "X-CSRF-Token") => [String] }
 header! { (POSTAccept, "Accept") => [String] }
 
 struct Tower {
+    client: Client,
     tid: String,
     uid: String,
     conn_guid: String,
@@ -45,6 +46,7 @@ struct Tower {
 impl Tower {
     pub fn new() -> Tower {
         Tower {
+            client: Client::new(),
             tid: String::new(),
             uid: String::new(),
             conn_guid: String::new(),
@@ -83,8 +85,7 @@ impl Tower {
 
         // members page
         let url = &self.members_url(&self.tid);
-        let client = Client::new();
-        let request = client.get(url).headers(self.headers.clone());
+        let request = self.client.get(url).headers(self.headers.clone());
         let mut response = request.send().unwrap();
         let mut content = String::new();
         let _ = response.read_to_string(&mut content);
@@ -134,9 +135,8 @@ impl Tower {
 
     pub fn show_calendar_info(&self) {
 
-        let client = Client::new();
         let url = format!("https://tower.im/members/{}/calendar_events/", self.uid);
-        let request = client.get(&url).headers(self.headers.clone());
+        let request = self.client.get(&url).headers(self.headers.clone());
         let mut response = request.send().unwrap();
         let mut content = String::new();
         let _ = response.read_to_string(&mut content);
@@ -153,11 +153,13 @@ impl Tower {
         // get weekly info
         let url = format!("https://tower.im/members/{}/weekly_reports/{}-{}/edit?conn_guid={}",
                             self.uid, year, week, self.conn_guid);
-        let client = Client::new();
-        let request = client.get(&url).headers(self.headers.clone());
-        let mut response = request.send().unwrap();
+
         let mut result = String::new();
-        let _ = response.read_to_string(&mut result);
+        {
+            let request = self.client.get(&url).headers(self.headers.clone());
+            let mut response = request.send().unwrap();
+            let _ = response.read_to_string(&mut result);
+        }
 
         let json: Json = result.parse().unwrap();
         let result = json["html"].as_string().unwrap();
@@ -194,7 +196,7 @@ impl Tower {
 
         let url = format!("https://tower.im/members/{}/weekly_reports/{}-{}",
                             self.uid, year, week);
-        let request = client.post(&url).body(&send_data).headers(headers);
+        let request = self.client.post(&url).body(&send_data).headers(headers);
         let mut response = request.send().unwrap();
         let mut result = String::new();
         let _ = response.read_to_string(&mut result);
@@ -225,9 +227,8 @@ impl Tower {
 
     fn get_weekly_reports(&self) -> (Vec<String>, Vec<String>) {
 
-        let client = Client::new();
         let url = self.weekly_reports_url(&self.uid, &self.conn_guid);
-        let request = client.get(&url).headers(self.headers.clone());
+        let request = self.client.get(&url).headers(self.headers.clone());
         let mut response = request.send().unwrap();
         let mut content = String::new();
         let _ = response.read_to_string(&mut content);
