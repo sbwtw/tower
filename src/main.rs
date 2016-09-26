@@ -179,7 +179,7 @@ impl Tower {
         }
 
         // check answers match fields
-        while !self.confirm_answers(&fields) {
+        while self.answers.is_empty() || !self.confirm_answers(&fields) {
             self.get_weekly_answers(&fields);
         }
 
@@ -289,7 +289,7 @@ impl Tower {
             }
         }
 
-        ask_question("Submit your answers?", true)
+        ask_question("Submit your answers?", !self.answers.is_empty())
     }
 
     fn get_weekly_answers(&mut self, fields: &Vec<(&str, &str, &str)>) {
