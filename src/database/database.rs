@@ -7,7 +7,7 @@ use self::rusqlite::SQLITE_OPEN_READ_ONLY;
 
 use std::result::Result;
 
-pub struct  SqliteCookie {
+pub struct SqliteCookie {
     pub path: String,
 
     team_id: String,
@@ -28,7 +28,10 @@ impl SqliteCookie {
         let connection_flag = SQLITE_OPEN_READ_ONLY;
         let connection = Connection::open_with_flags(self.path.clone(), connection_flag).unwrap();
 
-        let mut stmt = connection.prepare("select baseDomain, name, value from moz_cookies where baseDomain = 'tower.im' or baseDomain = '.tower.im'").unwrap();
+        let mut stmt =
+            connection.prepare("select baseDomain, name, value from moz_cookies where baseDomain = \
+                          'tower.im' or baseDomain = '.tower.im'")
+                .unwrap();
         let mut rows = stmt.query(&[]).unwrap();
 
         while let Some(res) = rows.next() {
@@ -40,7 +43,7 @@ impl SqliteCookie {
             match name.as_ref() {
                 "remember_team_guid" => self.team_id = value,
                 "remember_token" => self.token = value,
-                _ => {},
+                _ => {}
             }
         }
 

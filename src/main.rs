@@ -72,8 +72,13 @@ impl Tower {
                 CookiePair::new("remember_team_guid".to_owned(), self.tid.clone()),
                 CookiePair::new("remember_token".to_owned(), token.clone()),
             ]);
-        let header_host = Host{hostname: "tower.im".to_owned(), port: None};
-        let header_ua = UserAgent("Mozilla/5.0 (X11; Linux x86_64; rv:51.0) Gecko/20100101 Firefox/51.0".to_owned());
+        let header_host = Host {
+            hostname: "tower.im".to_owned(),
+            port: None,
+        };
+        let header_ua = UserAgent("Mozilla/5.0 (X11; Linux x86_64; rv:51.0) Gecko/20100101 \
+                                   Firefox/51.0"
+            .to_owned());
 
         // set headers
         {
@@ -117,7 +122,8 @@ impl Tower {
         // find member uid list
         let re = Regex::new(r#"href="/members/(\w+)" title="([^"]+)"#).unwrap();
         for caps in re.captures_iter(&content) {
-            self.member_list.insert(caps.at(2).unwrap().to_owned(), caps.at(1).unwrap().to_owned());
+            self.member_list.insert(caps.at(2).unwrap().to_owned(),
+                                    caps.at(1).unwrap().to_owned());
         }
 
         true
@@ -157,7 +163,10 @@ impl Tower {
 
         // get weekly info
         let url = format!("https://tower.im/members/{}/weekly_reports/{}-{}/edit?conn_guid={}",
-                            self.uid, year, week, self.conn_guid);
+                          self.uid,
+                          year,
+                          week,
+                          self.conn_guid);
 
         let mut result = String::new();
         {
@@ -170,7 +179,8 @@ impl Tower {
         let result = json["html"].as_string().unwrap();
 
         let mut fields = Vec::<(&str, &str, &str)>::new();
-        let re = Regex::new(r#"<input.*?name="(.*?)".*?value="(.*?)".*?>\s*(.*?)\s*</div>"#).unwrap();
+        let re = Regex::new(r#"<input.*?name="(.*?)".*?value="(.*?)".*?>\s*(.*?)\s*</div>"#)
+            .unwrap();
         for caps in re.captures_iter(&result) {
             let k = caps.at(1).unwrap();
             let v = caps.at(2).unwrap();
@@ -200,7 +210,9 @@ impl Tower {
         headers.set(POSTAccept("application/json, text/javascript, */*; q=0.01".to_owned()));
 
         let url = format!("https://tower.im/members/{}/weekly_reports/{}-{}",
-                            self.uid, year, week);
+                          self.uid,
+                          year,
+                          week);
         let request = self.client.post(&url).body(&send_data).headers(headers);
         let mut response = request.send().unwrap();
         let mut result = String::new();
@@ -325,7 +337,9 @@ impl Tower {
     }
 
     fn weekly_reports_url<T: AsRef<str>>(&self, uid: T, conn_guid: T) -> String {
-        format!("https://tower.im/members/{}/weekly_reports/?conn_guid={}&pjax=1", uid.as_ref(), conn_guid.as_ref())
+        format!("https://tower.im/members/{}/weekly_reports/?conn_guid={}&pjax=1",
+                uid.as_ref(),
+                conn_guid.as_ref())
     }
 
     // fn profile_url<T: AsRef<str>>(&self, uid: T) -> String {
@@ -352,7 +366,7 @@ fn ask_question<T: AsRef<str>>(q: T, default: bool) -> bool {
     } else {
         print!("{} [y/N]:", q.as_ref());
     }
-    let _  = stdout().flush();
+    let _ = stdout().flush();
 
     let mut result = String::new();
     stdin().read_line(&mut result).unwrap();
@@ -360,8 +374,8 @@ fn ask_question<T: AsRef<str>>(q: T, default: bool) -> bool {
 
     match result.as_str() {
         "y" | "yes" => true,
-        "n" | "no"  => false,
-        _           => default,
+        "n" | "no" => false,
+        _ => default,
     }
 }
 
@@ -376,13 +390,19 @@ fn search_cookie_sqlite() -> Option<String> {
     }
 
     for line in BufReader::new(&file.unwrap()).lines() {
-        if line.is_err() {continue;}
+        if line.is_err() {
+            continue;
+        }
 
         let l = line.unwrap();
-        if !l.starts_with("Path=") {continue;}
+        if !l.starts_with("Path=") {
+            continue;
+        }
 
         let dir: Vec<&str> = l.split('=').collect();
-        let sqlite = format!("{}/.mozilla/firefox/{}/cookies.sqlite", home.display(), dir[1]);
+        let sqlite = format!("{}/.mozilla/firefox/{}/cookies.sqlite",
+                             home.display(),
+                             dir[1]);
         if Path::new(&sqlite).exists() {
             return Some(sqlite);
         } else {
@@ -434,9 +454,9 @@ fn main() {
         panic!("cant load cookies");
     }
 
-    //if matches.is_present("reports") {
-        //println!("{:?}", matches.value_of("reports"));
-    //}
+    // if matches.is_present("reports") {
+    // println!("{:?}", matches.value_of("reports"));
+    // }
 
     if matches.is_present("send") {
         tower.send_weekly_reports();
