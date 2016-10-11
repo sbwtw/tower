@@ -38,6 +38,7 @@ struct Tower {
     tid: String,
     uid: String,
     conn_guid: String,
+    weekly_info: Vec<(String, String, String)>,
     answers: Vec<String>,
     headers: Headers,
     member_list: HashMap<String, String>,
@@ -50,6 +51,7 @@ impl Tower {
             tid: String::new(),
             uid: String::new(),
             conn_guid: String::new(),
+            weekly_info: Vec::<(String, String, String)>::new(),
             answers: Vec::<String>::new(),
             headers: Headers::new(),
             member_list: HashMap::with_capacity(200),
@@ -158,39 +160,16 @@ impl Tower {
 
     pub fn send_weekly_reports(&mut self) {
 
+        if self.weekly_info.is_empty() {
+            self.load_weekly_info();
+        }
+
         let year = self.current_year();
         let week = self.current_week();
 
-        // get weekly info
-        let url = format!("https://tower.im/members/{}/weekly_reports/{}-{}/edit?conn_guid={}",
-                          self.uid,
-                          year,
-                          week,
-                          self.conn_guid);
-
-        let mut result = String::new();
-        {
-            let request = self.client.get(&url).headers(self.headers.clone());
-            let mut response = request.send().unwrap();
-            let _ = response.read_to_string(&mut result);
-        }
-
-        let json: Json = result.parse().unwrap();
-        let result = json["html"].as_string().unwrap();
-
-        let mut fields = Vec::<(&str, &str, &str)>::new();
-        let re = Regex::new(r#"<input.*?name="(.*?)".*?value="(.*?)".*?>\s*(.*?)\s*</div>"#)
-            .unwrap();
-        for caps in re.captures_iter(&result) {
-            let k = caps.at(1).unwrap();
-            let v = caps.at(2).unwrap();
-            let t = caps.at(3).unwrap();
-            fields.push((k, v, t));
-        }
-
         // check answers match fields
-        while self.answers.is_empty() || !self.confirm_answers(&fields) {
-            self.get_weekly_answers(&fields);
+        while self.answers.is_empty() || !self.confirm_answers() {
+            self.get_weekly_answers();
         }
 
         let mut answers = Array::new();
@@ -198,7 +177,8 @@ impl Tower {
 
             let mut object = Object::new();
             object.insert("content".to_owned(), Json::String(ans.to_owned()));
-            object.insert(fields[i].0.to_owned(), Json::String(fields[i].1.to_owned()));
+            object.insert(self.weekly_info[i].0.clone(),
+                          Json::String(self.weekly_info[i].1.clone()));
 
             answers.push(Json::Object(object));
         }
@@ -236,6 +216,60 @@ impl Tower {
 
         let day_of_week: usize = strftime("%u", &now()).unwrap().parse().unwrap();
         self.send_day_reports(day_of_week - 1);
+    }
+
+    pub fn send_fake_reports(&mut self) {
+
+        self.load_weekly_info();
+        self.answers = self.get_weekly_reports().1;
+
+        for i in self.answers.iter_mut() {
+            if i.is_empty() {
+                i.push_str("<p></p><br/>");
+            }
+        }
+
+        for _ in self.answers.len()..self.weekly_info.len() {
+            self.answers.push("<p></p><br/>".to_owned());
+        }
+
+        self.send_weekly_reports();
+    }
+
+    fn load_weekly_info(&mut self) {
+
+        assert!(self.weekly_info.is_empty());
+
+        let year = self.current_year();
+        let week = self.current_week();
+
+        // get weekly info
+        let url = format!("https://tower.im/members/{}/weekly_reports/{}-{}/edit?conn_guid={}",
+                          self.uid,
+                          year,
+                          week,
+                          self.conn_guid);
+
+        let mut result = String::new();
+        {
+            let request = self.client.get(&url).headers(self.headers.clone());
+            let mut response = request.send().unwrap();
+            let _ = response.read_to_string(&mut result);
+        }
+
+        let json: Json = result.parse().unwrap();
+        let result = json["html"].as_string().unwrap();
+
+        let ref mut fields = self.weekly_info;
+        // let mut fields = Vec::<(&str, &str, &str)>::new();
+        let re = Regex::new(r#"<input.*?name="(.*?)".*?value="(.*?)".*?>\s*(.*?)\s*</div>"#)
+            .unwrap();
+        for caps in re.captures_iter(&result) {
+            let k = caps.at(1).unwrap();
+            let v = caps.at(2).unwrap();
+            let t = caps.at(3).unwrap();
+            fields.push((k.to_owned(), v.to_owned(), t.to_owned()));
+        }
     }
 
     // send spec day report, index is start with 0
@@ -283,33 +317,33 @@ impl Tower {
         (titles, contents)
     }
 
-    fn confirm_answers(&self, fields: &Vec<(&str, &str, &str)>) -> bool {
-        assert!(fields.len() >= self.answers.len());
+    fn confirm_answers(&self) -> bool {
+        assert!(self.weekly_info.len() >= self.answers.len());
 
         print!("\n");
 
         // print user answers
         for (i, ref answer) in self.answers.iter().enumerate() {
-            println!("{}:\n{}\n\n", fields[i].2, answer);
+            println!("{}:\n{}\n\n", self.weekly_info[i].2, answer);
         }
 
-        if fields.len() != self.answers.len() {
+        if self.weekly_info.len() != self.answers.len() {
             println!("some fields not filled:");
 
-            for i in self.answers.len()..fields.len() {
-                println!("{}", fields[i].2);
+            for i in self.answers.len()..self.weekly_info.len() {
+                println!("{}", self.weekly_info[i].2);
             }
         }
 
         ask_question("Submit your answers?", !self.answers.is_empty())
     }
 
-    fn get_weekly_answers(&mut self, fields: &Vec<(&str, &str, &str)>) {
+    fn get_weekly_answers(&mut self) {
 
         print!("\n");
 
         let exist_len = self.answers.len();
-        for (i, &(_, _, title)) in fields.iter().enumerate() {
+        for (i, &(_, _, ref title)) in self.weekly_info.iter().enumerate() {
             println!("\n{}:", title);
 
             let overflow = i >= exist_len;
@@ -333,7 +367,7 @@ impl Tower {
             }
         }
 
-        assert!(fields.len() == self.answers.len())
+        assert!(self.weekly_info.len() == self.answers.len())
     }
 
     fn weekly_reports_url<T: AsRef<str>>(&self, uid: T, conn_guid: T) -> String {
@@ -437,6 +471,10 @@ fn main() {
                          .long("today")
                          .conflicts_with("send")
                          .help("Send your today reports"))
+                    .arg(Arg::with_name("fake")
+                         .short("f")
+                         .long("fake")
+                         .help("do some evil(add fake reports if not filled to cheat robot)."))
                     //.arg(Arg::with_name("reports")
                          //.short("r")
                          //.long("reports")
@@ -457,6 +495,10 @@ fn main() {
     // if matches.is_present("reports") {
     // println!("{:?}", matches.value_of("reports"));
     // }
+
+    if matches.is_present("fake") {
+        tower.send_fake_reports();
+    }
 
     if matches.is_present("send") {
         tower.send_weekly_reports();
