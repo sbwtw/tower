@@ -156,6 +156,7 @@ impl Tower {
 
         // TODO: process content
         println!("{}", content);
+        // println!("{:?}", self.current_time_formatted());
     }
 
     pub fn send_weekly_reports(&mut self) {
@@ -188,12 +189,13 @@ impl Tower {
 
         let mut headers = self.headers.clone();
         headers.set(POSTAccept("application/json, text/javascript, */*; q=0.01".to_owned()));
+        self.headers = headers;
 
         let url = format!("https://tower.im/members/{}/weekly_reports/{}-{}",
                           self.uid,
                           year,
                           week);
-        let request = self.client.post(&url).body(&send_data).headers(headers);
+        let request = self.client.post(&url).body(&send_data).headers(self.headers.clone());
         let mut response = request.send().unwrap();
         let mut result = String::new();
         let _ = response.read_to_string(&mut result);
@@ -218,6 +220,12 @@ impl Tower {
         self.send_day_reports(day_of_week - 1);
     }
 
+    pub fn send_overtime_record(&mut self) {
+
+        let title = "aaaa";
+        self.send_overtime_internal(title);
+    }
+
     pub fn send_fake_reports(&mut self) {
 
         self.load_weekly_info();
@@ -234,6 +242,40 @@ impl Tower {
         }
 
         self.send_weekly_reports();
+    }
+
+    fn send_overtime_internal<T: AsRef<str>>(&mut self, title: T) {
+
+        let post_url = format!("https://tower.im/teams/{}/calendar_events/", self.tid);
+        let start_time = "2016-11-30+09%3A00%3A00";
+        let end_time = "2016-11-30+17%3A00%3A00";
+        let post_body = format!("conn_guid={}&content={}&starts_at={}&ends_at={}&is_show_creator=true&caleventable_type=Calendar&caleventable_guid=b96e5a357a884c7e8c5c2ab12858dd02&schedule_interval=1",
+                                self.conn_guid,
+                                title.as_ref(),
+                                start_time,
+                                end_time);
+        // let post_body = format!("conn_guid={}&content={}&starts_at={}&ends_at={}&schedule_until={}&schedule_every=0&location=&remind_time=&is_show_creator=true&member_guids=&caleventable_type=Calendar&caleventable_guid=b96e5a357a884c7e8c5c2ab12858dd02&start=2016-10-31&end=2016-12-04&schedule_interval=1", self.conn_guid, content, start_time, end_time, schedule_until);
+
+        // post data and check result
+        let result: Json = self.post_data(post_url, post_body).parse().unwrap();
+        let object = result.as_object().unwrap();
+
+        if object.get("success") == Some(&Json::Boolean(true)) {
+            return;
+        }
+
+        info!("post overtime error:");
+        info!("{}", result);
+    }
+
+    fn post_data<T: AsRef<str>>(&self, url: T, body: T) -> String {
+        let request =
+            self.client.post(url.as_ref()).body(body.as_ref()).headers(self.headers.clone());
+        let mut response = request.send().unwrap();
+        let mut result = String::new();
+        let _ = response.read_to_string(&mut result);
+
+        result
     }
 
     fn load_weekly_info(&mut self) {
@@ -391,6 +433,17 @@ impl Tower {
     fn current_week(&self) -> String {
         strftime("%W", &now()).unwrap()
     }
+
+    fn current_time_formatted(&self) -> (i32, i32) {
+        let tm = now();
+        let hour = tm.tm_hour;
+        let minute = tm.tm_min;
+        let temp_min = (minute + 15) / 30 * 30;
+        let result_hour = hour + temp_min / 60;
+        let result_min = temp_min % 60;
+
+        (result_hour, result_min)
+    }
 }
 
 fn ask_question<T: AsRef<str>>(q: T, default: bool) -> bool {
@@ -462,6 +515,10 @@ fn main() {
                          .short("c")
                          .long("calendar")
                          .help("Show your calendar info"))
+                    .arg(Arg::with_name("overtime")
+                         .short("o")
+                         .long("overtime")
+                         .help("Post overtime record"))
                     .arg(Arg::with_name("send")
                          .short("s")
                          .long("send")
@@ -514,5 +571,9 @@ fn main() {
 
     if matches.is_present("calendar") {
         tower.show_calendar_info();
+    }
+
+    if matches.is_present("overtime") {
+        tower.send_overtime_record();
     }
 }
