@@ -108,24 +108,24 @@ impl Tower {
         // get csrf-token
         let re = Regex::new(r#"content="([^"]+)" name="csrf-token""#).unwrap();
         let caps = re.captures(&content).unwrap();
-        let header_csrf_token = XCSRFToken(caps.at(1).unwrap().to_owned());
+        let header_csrf_token = XCSRFToken(caps.get(1).unwrap().as_str().to_owned());
         self.headers.set(header_csrf_token);
 
         // get conn-guid
         let re = Regex::new(r#"id="conn-guid" value="(\w+)"#).unwrap();
         let caps = re.captures(&content).unwrap();
-        self.conn_guid = caps.at(1).unwrap().to_owned();
+        self.conn_guid = caps.get(1).unwrap().as_str().to_owned();
 
         // get uid
         let re = Regex::new(r#"id="member-guid" value="(\w+)"#).unwrap();
         let caps = re.captures(&content).unwrap();
-        self.uid = caps.at(1).unwrap().to_owned();
+        self.uid = caps.get(1).unwrap().as_str().to_owned();
 
         // find member uid list
         let re = Regex::new(r#"href="/members/(\w+)" title="([^"]+)"#).unwrap();
         for caps in re.captures_iter(&content) {
-            self.member_list.insert(caps.at(2).unwrap().to_owned(),
-                                    caps.at(1).unwrap().to_owned());
+            self.member_list.insert(caps.get(2).unwrap().as_str().to_owned(),
+                                    caps.get(1).unwrap().as_str().to_owned());
         }
 
         true
@@ -307,9 +307,9 @@ impl Tower {
         let re = Regex::new(r#"<input.*?name="(.*?)".*?value="(.*?)".*?>\s*(.*?)\s*</div>"#)
             .unwrap();
         for caps in re.captures_iter(&result) {
-            let k = caps.at(1).unwrap();
-            let v = caps.at(2).unwrap();
-            let t = caps.at(3).unwrap();
+            let k = caps.get(1).unwrap().as_str();
+            let v = caps.get(2).unwrap().as_str();
+            let t = caps.get(3).unwrap().as_str();
             fields.push((k.to_owned(), v.to_owned(), t.to_owned()));
         }
     }
@@ -344,14 +344,14 @@ impl Tower {
         let mut titles = Vec::new();
         let re = Regex::new(r#"<dt><i class="icon twr twr-quote-left"></i>([^<]+)</dt>"#).unwrap();
         for caps in re.captures_iter(&content) {
-            titles.push(caps.at(1).unwrap().to_owned());
+            titles.push(caps.get(1).unwrap().as_str().to_owned());
         }
 
         // search weekly_content
         let mut contents = Vec::new();
         let re = Regex::new(r#"<dd class="editor-style">(.*?)</dd>"#).unwrap();
         for caps in re.captures_iter(&content) {
-            contents.push(caps.at(1).unwrap().to_owned());
+            contents.push(caps.get(1).unwrap().as_str().to_owned());
         }
 
         assert!(titles.len() == contents.len());
