@@ -27,6 +27,7 @@ use database::SqliteCookie;
 
 use hyper::client::*;
 use hyper::header::*;
+use hyper::status::StatusCode;
 
 use regex::Regex;
 
@@ -246,21 +247,34 @@ impl Tower {
 
     fn send_overtime_internal<T: AsRef<str>>(&mut self, title: T) {
 
+        let day_string = strftime("%Y-%m-%d", &now()).unwrap();
+        let (cur_hour, cur_min) = self.current_time_formatted();
+
         let post_url = format!("https://tower.im/teams/{}/calendar_events/", self.tid);
-        let start_time = "2016-11-30+09%3A00%3A00";
-        let end_time = "2016-11-30+17%3A00%3A00";
+        let start_time = format!("{}+17%3A30%3A00", day_string);
+        let end_time = format!("{}+{}%3A{}%3A00", day_string, cur_hour, cur_min);
         let post_body = format!("conn_guid={}&content={}&starts_at={}&ends_at={}&is_show_creator=true&caleventable_type=Calendar&caleventable_guid=b96e5a357a884c7e8c5c2ab12858dd02&schedule_interval=1",
                                 self.conn_guid,
                                 title.as_ref(),
                                 start_time,
                                 end_time);
+
         // let post_body = format!("conn_guid={}&content={}&starts_at={}&ends_at={}&schedule_until={}&schedule_every=0&location=&remind_time=&is_show_creator=true&member_guids=&caleventable_type=Calendar&caleventable_guid=b96e5a357a884c7e8c5c2ab12858dd02&start=2016-10-31&end=2016-12-04&schedule_interval=1", self.conn_guid, content, start_time, end_time, schedule_until);
 
+        // println!("{}, {}", start_time, end_time);
+
+        // let post_body = format!("conn_guid={}&content={}&starts_at=2017-01-06+09%3A00%3A00&ends_at=2017-01-06+17%3A00%3A00&schedule_until=2017-01-06+23%3A59%3A59&schedule_every=0&location=&remind_time=&is_show_creator=true&member_guids=&caleventable_type=Calendar&caleventable_guid=b96e5a357a884c7e8c5c2ab12858dd02&start=2016-12-26&end=2017-02-05&schedule_interval=1",
+        //                     self.conn_guid,
+        //                     title.as_ref()
+        //                     );
+
         // post data and check result
-        let result: Json = self.post_data(post_url, post_body).parse().unwrap();
+        let response = self.post_data(post_url, post_body);
+        let result: Json = response.parse().unwrap();
         let object = result.as_object().unwrap();
 
         if object.get("success") == Some(&Json::Boolean(true)) {
+            println!("{:?}", object);
             return;
         }
 
@@ -272,6 +286,17 @@ impl Tower {
         let request =
             self.client.post(url.as_ref()).body(body.as_ref()).headers(self.headers.clone());
         let mut response = request.send().unwrap();
+        assert_eq!(StatusCode::Ok, response.status);
+        let mut result = String::new();
+        let _ = response.read_to_string(&mut result);
+
+        result
+    }
+
+    fn get_data<T: AsRef<str>>(&self, url: T) -> String {
+        let req = self.client.get(url.as_ref()).headers(self.headers.clone());
+        let mut response = req.send().unwrap();
+        assert_eq!(StatusCode::Ok, response.status);
         let mut result = String::new();
         let _ = response.read_to_string(&mut result);
 
@@ -292,13 +317,7 @@ impl Tower {
                           week,
                           self.conn_guid);
 
-        let mut result = String::new();
-        {
-            let request = self.client.get(&url).headers(self.headers.clone());
-            let mut response = request.send().unwrap();
-            let _ = response.read_to_string(&mut result);
-        }
-
+        let result = self.get_data(&url);
         let json: Json = result.parse().unwrap();
         let result = json["html"].as_string().unwrap();
 
