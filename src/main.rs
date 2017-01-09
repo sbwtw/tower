@@ -221,10 +221,8 @@ impl Tower {
         self.send_day_reports(day_of_week - 1);
     }
 
-    pub fn send_overtime_record(&mut self) {
-
-        let title = "aaaa";
-        self.send_overtime_internal(title);
+    pub fn send_overtime_record<T: AsRef<str>>(&mut self, title: T, cc_name: T) {
+        self.send_overtime_internal(title, cc_name);
     }
 
     pub fn send_fake_reports(&mut self) {
@@ -245,7 +243,7 @@ impl Tower {
         self.send_weekly_reports();
     }
 
-    fn send_overtime_internal<T: AsRef<str>>(&mut self, title: T) {
+    fn send_overtime_internal<T: AsRef<str>>(&mut self, title: T, cc_name: T) {
 
         let day_string = strftime("%Y-%m-%d", &now()).unwrap();
         let (cur_hour, cur_min) = self.current_time_formatted();
@@ -273,16 +271,37 @@ impl Tower {
         let result: Json = response.parse().unwrap();
         let object = result.as_object().unwrap();
 
-        if object.get("success") == Some(&Json::Boolean(true)) {
-            println!("{:?}", object);
+        if object.get("success") != Some(&Json::Boolean(true)) {
+            info!("post overtime error:");
+            info!("{}", result);
             return;
         }
 
-        info!("post overtime error:");
-        info!("{}", result);
+        if let Some(&Json::String(ref url)) = object.get("url") {
+            // let content = "conn_guid=51586e27839ff9f7766f16bad29b49c4&comment_content=%3Cp%3E%3Ca+href%3D%22%2Fmembers%2F83555be08c1a4912a1f875636afa3f52%22+data-mention%3D%22true%22%3E%40%E5%BC%A0%E7%BB%A7%E5%BE%B7%3C%2Fa%3E%26nbsp%3B%3Cbr%3E%3C%2Fp%3E&is_html=1&cc_guids=83555be08c1a4912a1f875636afa3f52";
+
+            let cc_name = cc_name.as_ref();
+            let cc_guid = match self.member_list.get(cc_name) {
+                Some(guid) => guid,
+                _ => { println!("User {} not exist!", cc_name); return; },
+            };
+
+
+            let comment_content= format!("<p><a href=\"/members/{}\" data-mention=\"true\">@{}</a></p>", cc_guid, cc_name);
+            let content = format!("conn_guid={}&comment_content={}&is_html=1&cc_guids={}",
+                                   self.conn_guid,
+                                   comment_content,
+                                   self.member_list.get(cc_name).unwrap());
+
+            let result = self.post_data(format!("https://tower.im{}/comments", url), content);
+
+            println!("send overtime finished, url is https://tower.im{}", url);
+        } else {
+            println!("send overtime failed.");
+        }
     }
 
-    fn post_data<T: AsRef<str>>(&self, url: T, body: T) -> String {
+    fn post_data<U: AsRef<str>, B: AsRef<str>>(&self, url: U, body: B) -> String {
         let request =
             self.client.post(url.as_ref()).body(body.as_ref()).headers(self.headers.clone());
         let mut response = request.send().unwrap();
@@ -537,7 +556,16 @@ fn main() {
                     .arg(Arg::with_name("overtime")
                          .short("o")
                          .long("overtime")
+                         .requires("cc_name")
                          .help("Post overtime record"))
+                    .arg(Arg::with_name("title")
+                         .long("title")
+                         .takes_value(true)
+                         .help("Overtime list title"))
+                    .arg(Arg::with_name("cc_name")
+                         .long("cc")
+                         .takes_value(true)
+                         .help("Overtime list @somebody"))
                     .arg(Arg::with_name("send")
                          .short("s")
                          .long("send")
@@ -593,6 +621,9 @@ fn main() {
     }
 
     if matches.is_present("overtime") {
-        tower.send_overtime_record();
+        let title = matches.value_of("title").unwrap_or("加班登记");
+        let cc_name = matches.value_of("cc_name").unwrap();
+
+        tower.send_overtime_record(title, cc_name);
     }
 }
