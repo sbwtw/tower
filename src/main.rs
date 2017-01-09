@@ -16,6 +16,8 @@ use std::env::*;
 use std::fs::File;
 use std::path::Path;
 use std::collections::HashMap;
+use std::process::Command;
+use std::os::unix::process::CommandExt;
 
 use clap::{Arg, App};
 
@@ -299,7 +301,12 @@ impl Tower {
 
             let _ = self.post_data(format!("https://tower.im{}/comments", url), content);
 
-            println!("send overtime finished, url is https://tower.im{}", url);
+            let url = format!("https://tower.im{}", url);
+            println!("send overtime finished, url is {}", url);
+
+            Command::new("gvfs-open")
+                    .arg(url)
+                    .exec();
         } else {
             println!("send overtime failed.");
         }
