@@ -244,6 +244,14 @@ impl Tower {
     }
 
     fn send_overtime_internal<T: AsRef<str>>(&mut self, title: T, cc_name: T) {
+        let cc_name = cc_name.as_ref();
+        let cc_guid = match self.member_list.get(cc_name) {
+            Some(guid) => guid,
+            _ => {
+                println!("User {} not exist!", cc_name);
+                return;
+            }
+        };
 
         let day_string = strftime("%Y-%m-%d", &now()).unwrap();
         let (cur_hour, cur_min) = self.current_time_formatted();
@@ -280,20 +288,16 @@ impl Tower {
         if let Some(&Json::String(ref url)) = object.get("url") {
             // let content = "conn_guid=51586e27839ff9f7766f16bad29b49c4&comment_content=%3Cp%3E%3Ca+href%3D%22%2Fmembers%2F83555be08c1a4912a1f875636afa3f52%22+data-mention%3D%22true%22%3E%40%E5%BC%A0%E7%BB%A7%E5%BE%B7%3C%2Fa%3E%26nbsp%3B%3Cbr%3E%3C%2Fp%3E&is_html=1&cc_guids=83555be08c1a4912a1f875636afa3f52";
 
-            let cc_name = cc_name.as_ref();
-            let cc_guid = match self.member_list.get(cc_name) {
-                Some(guid) => guid,
-                _ => { println!("User {} not exist!", cc_name); return; },
-            };
-
-
-            let comment_content= format!("<p><a href=\"/members/{}\" data-mention=\"true\">@{}</a></p>", cc_guid, cc_name);
+            let comment_content = format!("<p><a href=\"/members/{}\" \
+                                           data-mention=\"true\">@{}</a></p>",
+                                          cc_guid,
+                                          cc_name);
             let content = format!("conn_guid={}&comment_content={}&is_html=1&cc_guids={}",
-                                   self.conn_guid,
-                                   comment_content,
-                                   self.member_list.get(cc_name).unwrap());
+                                  self.conn_guid,
+                                  comment_content,
+                                  self.member_list.get(cc_name).unwrap());
 
-            let result = self.post_data(format!("https://tower.im{}/comments", url), content);
+            let _ = self.post_data(format!("https://tower.im{}/comments", url), content);
 
             println!("send overtime finished, url is https://tower.im{}", url);
         } else {
