@@ -45,6 +45,7 @@ struct Tower {
     answers: Vec<String>,
     headers: Headers,
     member_list: HashMap<String, String>,
+    disable_confirm: bool,
 }
 
 impl Tower {
@@ -58,6 +59,7 @@ impl Tower {
             answers: Vec::<String>::new(),
             headers: Headers::new(),
             member_list: HashMap::with_capacity(200),
+            disable_confirm: false,
         }
     }
 
@@ -245,6 +247,10 @@ impl Tower {
         self.send_weekly_reports();
     }
 
+    pub fn disable_confirm(&mut self) {
+        self.disable_confirm = true;
+    }
+
     fn send_overtime_internal<T: AsRef<str>>(&mut self, title: T, cc_name: T) {
         let cc_name = cc_name.as_ref();
         let cc_guid = match self.member_list.get(cc_name) {
@@ -410,6 +416,8 @@ impl Tower {
 
     fn confirm_answers(&self) -> bool {
         assert!(self.weekly_info.len() >= self.answers.len());
+
+        if self.disable_confirm { return true; }
 
         print!("\n");
 
@@ -596,6 +604,9 @@ fn main() {
                          //.takes_value(true)
                          //.default_value("")
                          //.help("Your reports content"))
+                    .arg(Arg::with_name("confirm")
+                         .short("y")
+                         .help("Always say yes."))
                     .get_matches();
 
     env_logger::init().unwrap();
@@ -605,6 +616,10 @@ fn main() {
         tower.load_sqlite(file);
     } else {
         panic!("cant load cookies");
+    }
+
+    if matches.is_present("confirm") {
+        tower.disable_confirm();
     }
 
     // if matches.is_present("reports") {
