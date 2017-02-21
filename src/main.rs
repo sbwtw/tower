@@ -26,6 +26,7 @@ use time::*;
 use rustc_serialize::json::*;
 
 use database::SqliteCookie;
+use database::SqliteType;
 
 use hyper::client::*;
 use hyper::header::*;
@@ -63,11 +64,11 @@ impl Tower {
         }
     }
 
-    pub fn load_sqlite<T: AsRef<str>>(&mut self, file: T) -> bool {
+    pub fn load_sqlite<T: AsRef<str>>(&mut self, file: T, db_type: SqliteType) -> bool {
 
         debug!("load sqlite from: {}", file.as_ref());
 
-        let mut sc = SqliteCookie::new(file);
+        let mut sc = SqliteCookie::new(file, db_type);
         let _ = sc.read_data();
 
         // set headers
@@ -75,10 +76,9 @@ impl Tower {
 
         let token = sc.token();
 
-        let header_cookie = Cookie(vec![
-                CookiePair::new("remember_team_guid".to_owned(), self.tid.clone()),
-                CookiePair::new("remember_token".to_owned(), token.clone()),
-            ]);
+        let header_cookie =
+            Cookie(vec![CookiePair::new("remember_team_guid".to_owned(), self.tid.clone()),
+                        CookiePair::new("remember_token".to_owned(), token.clone())]);
         let header_host = Host {
             hostname: "tower.im".to_owned(),
             port: None,
@@ -311,8 +311,8 @@ impl Tower {
             println!("send overtime finished, url is {}", url);
 
             Command::new("gvfs-open")
-                    .arg(url)
-                    .exec();
+                .arg(url)
+                .exec();
         } else {
             println!("send overtime failed.");
         }
@@ -417,7 +417,9 @@ impl Tower {
     fn confirm_answers(&self) -> bool {
         assert!(self.weekly_info.len() >= self.answers.len());
 
-        if self.disable_confirm { return true; }
+        if self.disable_confirm {
+            return true;
+        }
 
         print!("\n");
 
@@ -523,7 +525,12 @@ fn ask_question<T: AsRef<str>>(q: T, default: bool) -> bool {
     }
 }
 
-fn search_cookie_sqlite() -> Option<String> {
+fn search_cookie_sqlite_chrome() -> Option<String> {
+    None
+    // Some("/home/.config/google-chrome/Profile 1/Cookies".to_owned())
+}
+
+fn search_cookie_sqlite_firefox() -> Option<String> {
 
     let home = home_dir().unwrap();
     let config_file = format!("{}/.mozilla/firefox/profiles.ini", home.display());
@@ -612,8 +619,11 @@ fn main() {
     env_logger::init().unwrap();
 
     let mut tower = Tower::new();
-    if let Some(file) = search_cookie_sqlite() {
-        tower.load_sqlite(file);
+
+    if let Some(file) = search_cookie_sqlite_chrome() {
+        tower.load_sqlite(file, SqliteType::Chrome);
+    } else if let Some(file) = search_cookie_sqlite_firefox() {
+        tower.load_sqlite(file, SqliteType::Firefox);
     } else {
         panic!("cant load cookies");
     }
