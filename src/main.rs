@@ -127,7 +127,7 @@ impl Tower {
         self.uid = caps.get(1).unwrap().as_str().to_owned();
 
         // find member uid list
-        let re = Regex::new(r#"href="/members/(\w+)" title="([^"]+)"#).unwrap();
+        let re = Regex::new(r#"href="/members/(\w+)"[\s\S]+?member-nickname">([^<]+)"#).unwrap();
         for caps in re.captures_iter(&content) {
             self.member_list.insert(caps.get(2).unwrap().as_str().to_owned(),
                                     caps.get(1).unwrap().as_str().to_owned());
