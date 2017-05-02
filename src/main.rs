@@ -4,6 +4,7 @@ extern crate log;
 extern crate env_logger;
 #[macro_use]
 extern crate hyper;
+extern crate hyper_native_tls;
 extern crate regex;
 extern crate time;
 extern crate rustc_serialize;
@@ -31,6 +32,8 @@ use database::SqliteType;
 use hyper::client::*;
 use hyper::header::*;
 use hyper::status::StatusCode;
+use hyper::net::HttpsConnector;
+use hyper_native_tls::NativeTlsClient;
 
 use regex::Regex;
 
@@ -52,7 +55,7 @@ struct Tower {
 impl Tower {
     pub fn new() -> Tower {
         Tower {
-            client: Client::new(),
+            client: Client::with_connector(HttpsConnector::new(NativeTlsClient::new().unwrap())),
             tid: String::new(),
             uid: String::new(),
             conn_guid: String::new(),
@@ -76,9 +79,10 @@ impl Tower {
 
         let token = sc.token();
 
-        let header_cookie =
-            Cookie(vec![CookiePair::new("remember_team_guid".to_owned(), self.tid.clone()),
-                        CookiePair::new("remember_token".to_owned(), token.clone())]);
+        let mut header_cookie = Cookie(vec![]);
+        header_cookie.0.push(format!("remember_team_guid={}", self.tid));
+        header_cookie.0.push(format!("remember_token={}", token));
+
         let header_host = Host {
             hostname: "tower.im".to_owned(),
             port: None,
@@ -104,8 +108,10 @@ impl Tower {
 
         // get extra cookies
         for cookie in &response.headers.get::<SetCookie>().unwrap().0 {
-            if cookie.name == "_tower2_session" {
-                self.headers.get_mut::<Cookie>().unwrap().push(cookie.clone());
+            if cookie.starts_with("_tower2_session") {
+                let i = cookie.split(';').next().unwrap();
+                info!("find cookie: {}", i);
+                self.headers.get_mut::<Cookie>().unwrap().push(i.to_owned());
                 break;
             }
         }
@@ -118,19 +124,22 @@ impl Tower {
 
         // get conn-guid
         let re = Regex::new(r#"id="conn-guid" value="(\w+)"#).unwrap();
-        let caps = re.captures(&content).unwrap();
+        let caps = re.captures(&content).unwrap_or_else(|| panic!("find conn-guid failed"));
         self.conn_guid = caps.get(1).unwrap().as_str().to_owned();
 
         // get uid
         let re = Regex::new(r#"id="member-guid" value="(\w+)"#).unwrap();
-        let caps = re.captures(&content).unwrap();
+        let caps = re.captures(&content).unwrap_or_else(|| panic!("find member-guid failed"));
         self.uid = caps.get(1).unwrap().as_str().to_owned();
 
         // find member uid list
         let re = Regex::new(r#"href="/members/(\w+)"[\s\S]+?member-nickname">([^<]+)"#).unwrap();
         for caps in re.captures_iter(&content) {
-            self.member_list.insert(caps.get(2).unwrap().as_str().to_owned(),
-                                    caps.get(1).unwrap().as_str().to_owned());
+            let name = caps.get(2).unwrap().as_str().to_owned();
+            let uid = caps.get(1).unwrap().as_str().to_owned();
+
+            info!("got member: {} {}", name, uid);
+            self.member_list.insert(name, uid);
         }
 
         true
@@ -310,7 +319,8 @@ impl Tower {
             let url = format!("https://tower.im{}", url);
             println!("send overtime finished, url is {}", url);
 
-            Command::new("gvfs-open")
+            Command::new("gio")
+                .arg("open")
                 .arg(url)
                 .exec();
         } else {
@@ -536,11 +546,8 @@ fn search_cookie_sqlite_firefox() -> Option<String> {
     let config_file = format!("{}/.mozilla/firefox/profiles.ini", home.display());
 
     let file = File::open(config_file);
-    if file.is_err() {
-        return None;
-    }
-
     for line in BufReader::new(&file.unwrap()).lines() {
+
         if line.is_err() {
             continue;
         }

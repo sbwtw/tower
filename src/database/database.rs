@@ -44,6 +44,8 @@ impl SqliteCookie {
     }
 
     fn read_firefox(&mut self) -> Result<(), ()> {
+        info!("read cookie from firefox");
+
         let connection_flag = SQLITE_OPEN_READ_ONLY;
         let connection = Connection::open_with_flags(self.path.clone(), connection_flag).unwrap();
 
@@ -58,6 +60,7 @@ impl SqliteCookie {
 
             let name: String = row.get(1);
             let value: String = row.get(2);
+            info!("got cookie: name = {}, value = {}", name, value);
 
             match name.as_ref() {
                 "remember_team_guid" => self.team_id = value,

@@ -1,5 +1,6 @@
 // ide
 .vscode
+rls.toml
 
 // targets
 target
