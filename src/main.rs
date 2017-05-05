@@ -632,7 +632,7 @@ fn main() {
     } else if let Some(file) = search_cookie_sqlite_firefox() {
         tower.load_sqlite(file, SqliteType::Firefox);
     } else {
-        panic!("cant load cookies");
+        panic!("can't load cookies");
     }
 
     if matches.is_present("confirm") {
